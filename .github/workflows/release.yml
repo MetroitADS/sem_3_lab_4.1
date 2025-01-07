@@ -1,0 +1,114 @@
+name: 'C++ CI'
+
+on: 
+  push:
+    branches:
+      - laba4
+      - feature/github_actions
+
+jobs:
+  build_ubuntu:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Install Dependencies
+        run: sudo apt-get update && sudo apt-get install libboost-test-dev -y
+
+      # List files for debugging purposes.. 
+      - name: List Files
+        run: |
+          ls -R
+
+      # Configure CMake, specifying the source directory explicitly
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build -DPATCH_VERSION=${{ github.run_number }}
+
+      # Build the project
+      - name: Build Project
+        run: cmake --build build
+
+
+      # Package the project (ensure that 'package' target is defined in CMakeLists.txt)
+      - name: Package Project
+        run: |
+          cd build
+          cmake --build . --target package
+      - name: List Files in Build Directory
+        run: |
+          ls -R build
+      # Create a release on GitHub
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release ${{ github.run_number }} (Ubuntu)
+          draft: false
+          prerelease: false
+
+      # Upload release asset
+      - name: Upload Release Asset
+        id: upload-release-asset-ubuntu
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/laba4-0.0.${{ github.run_number }}-Linux.deb
+          asset_name: laba4-0.0.${{ github.run_number }}-Linux.deb
+          asset_content_type: application/vnd.debian.binary-package
+          allowUpdates: true # Разрешаем обновление уже загруженного ассета
+
+  build_windows:
+    runs-on: windows-latest
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      # Configure project with CMake
+      - name: Configure CMake
+        run: cmake . -DPATCH_VERSION=${{ github.run_number }}
+
+      # Build project
+      - name: Build Project
+        run: cmake --build .
+
+      # Create package 
+      - name: Package Project
+        run: cmake --build . --target package
+
+      # List files for debugging purposes
+      - name: List Files in Build Directory
+        run: dir  # For Windows
+
+      # Create release on GitHub
+      - name: Create Release (Windows)
+        id: create_release_windows
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: windows${{ github.run_number }}
+          release_name: Release ${{ github.run_number }} (Windows)
+          draft: false 
+          prerelease: false 
+
+      # Upload release asset for Windows 
+      - name: Upload Release Asset (windows)
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release_windows.outputs.upload_url }}
+          asset_path: ./laba4-0.0.${{ github.run_number }}-win64.zip  # Adjust based on actual output filename.
+          asset_name: laba4-0.0.${{ github.run_number }}-win64.zip  # Adjust based on actual output filename.
+          asset_content_type: application/zip
